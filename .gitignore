@@ -1,0 +1,10 @@
+# Arquivos de log gerados em execução local
+logs/*.log
+
+# Arquivos temporários do Windows
+Thumbs.db
+desktop.ini
+*.tmp
+
+# Pasta do VS Code, caso utilize
+.vscode/
