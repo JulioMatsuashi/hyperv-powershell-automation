@@ -1,0 +1,207 @@
+<#
+.SYNOPSIS
+    Registra a tarefa agendada diária para execução automática do Backup-VM.ps1.
+
+.DESCRIPTION
+    Script desenvolvido como parte do Trabalho de Conclusão de Curso
+    "Automação de Provisionamento e Backup Local usando PowerShell e Hyper-V".
+
+    Cria uma tarefa no Agendador de Tarefas do Windows que executa o script
+    Backup-VM.ps1 diariamente às 02:00, com privilégios de Administrador,
+    utilizando o PowerShell 7. Cada parâmetro da tarefa é definido via
+    cmdlets nativos do módulo ScheduledTasks, dispensando o uso da interface
+    gráfica e tornando o processo reproduzível em qualquer host Hyper-V.
+
+    Estrutura do script (conforme Apêndice C do TCC):
+      Bloco 1 — Definição de parâmetros e variáveis
+      Bloco 2 — Validações de ambiente
+      Bloco 3 — Criação da tarefa agendada
+      Bloco 4 — Confirmação e registro em log
+
+.PARAMETER VMName
+    Nome da máquina virtual que será passado ao Backup-VM.ps1 na execução
+    agendada. Deve corresponder a uma VM existente no host Hyper-V.
+
+.PARAMETER ScriptPath
+    Caminho completo do arquivo Backup-VM.ps1.
+    Padrão: C:\HyperV\Scripts\Backup-VM.ps1
+
+.PARAMETER BackupRoot
+    Diretório raiz de destino dos backups, repassado ao Backup-VM.ps1.
+    Padrão: D:\HyperV\Backups
+
+.PARAMETER TaskName
+    Nome da tarefa criada no Agendador de Tarefas.
+    Padrão: Backup-VM-<VMName>
+
+.EXAMPLE
+    .\Register-BackupTask.ps1 -VMName "ServidorTeste01"
+
+    Registra a tarefa com os valores padrão: script em C:\HyperV\Scripts,
+    backup em D:\HyperV\Backups, execução diária às 02:00.
+
+.EXAMPLE
+    .\Register-BackupTask.ps1 -VMName "ServidorWeb01" -ScriptPath "D:\Scripts\Backup-VM.ps1" -BackupRoot "E:\Backups"
+
+    Registra a tarefa apontando para caminhos personalizados.
+
+.NOTES
+    Requisitos de ambiente:
+      - PowerShell 7.4 ou superior
+      - Módulo ScheduledTasks disponível (nativo no Windows)
+      - Console iniciado com privilégios de Administrador
+
+    Autor: Julio Hideki Moreira Matsuashi
+    TCC — Ciência da Computação — UNIP — 2025
+    Repositório: https://github.com/seu-usuario/hyperv-powershell-automation
+#>
+
+param (
+    [Parameter(Mandatory = $true)]
+    [string]$VMName,
+
+    [string]$ScriptPath = "C:\HyperV\Scripts\Backup-VM.ps1",
+    [string]$BackupRoot = "D:\HyperV\Backups",
+    [string]$TaskName   = "Backup-VM-$VMName"
+)
+
+# =============================================================================
+# BLOCO 1 — DEFINIÇÃO DE PARÂMETROS E VARIÁVEIS
+#
+# O caminho do executável é fixado para o PowerShell 7, garantindo
+# compatibilidade com os demais scripts do projeto. Os argumentos repassados
+# ao Backup-VM.ps1 seguem o mesmo padrão de parâmetros definido no script
+# de backup, mantendo consistência entre os componentes do sistema.
+# =============================================================================
+
+$LogDir  = "C:\HyperV\Logs"
+$LogFile = "$LogDir\RegisterTask_$(Get-Date -Format 'yyyyMMdd_HHmm').log"
+
+if (-not (Test-Path $LogDir)) {
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+}
+
+function Write-Log {
+    <#
+    .SYNOPSIS
+        Grava uma mensagem no console e no arquivo de log, com timestamp.
+    #>
+    param([string]$Message)
+    $entrada = "[$(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')] $Message"
+    Write-Host $entrada
+    Add-Content -Path $LogFile -Value $entrada
+}
+
+# Caminho do executável PowerShell 7
+$PwshPath = "C:\Program Files\PowerShell\7\pwsh.exe"
+
+# Argumentos repassados ao Backup-VM.ps1 na execução agendada
+$Arguments = "-NonInteractive -NoProfile -ExecutionPolicy Bypass " +
+             "-File `"$ScriptPath`" " +
+             "-VMName `"$VMName`" " +
+             "-BackupRoot `"$BackupRoot`""
+
+Write-Log "Iniciando registro da tarefa agendada: $TaskName"
+Write-Log "Script alvo   : $ScriptPath"
+Write-Log "VM alvo       : $VMName"
+Write-Log "Destino backup: $BackupRoot"
+Write-Log "Horário       : diariamente às 02:00"
+
+# =============================================================================
+# BLOCO 2 — VALIDAÇÕES DE AMBIENTE
+#
+# Antes de registrar a tarefa, o script verifica se o executável do
+# PowerShell 7 existe no caminho esperado e se o script de backup
+# está acessível no caminho informado. A ausência de qualquer um dos
+# dois inviabiliza a execução agendada e justifica a interrupção imediata.
+# =============================================================================
+
+Write-Log "Validando ambiente..."
+
+if (-not (Test-Path $PwshPath)) {
+    Write-Log "Erro: PowerShell 7 não encontrado em '$PwshPath'."
+    Write-Log "Instale o PowerShell 7 ou ajuste o caminho no script."
+    exit 1
+}
+
+if (-not (Test-Path $ScriptPath)) {
+    Write-Log "Erro: script de backup não encontrado em '$ScriptPath'."
+    Write-Log "Verifique o caminho informado no parâmetro -ScriptPath."
+    exit 1
+}
+
+Write-Log "Ambiente validado com sucesso."
+
+# =============================================================================
+# BLOCO 3 — CRIAÇÃO DA TAREFA AGENDADA
+#
+# A tarefa é composta por três objetos distintos:
+#   - Action : define o programa a executar e os argumentos repassados
+#   - Trigger: define a frequência e o horário de execução (diário às 02:00)
+#   - Settings: configura comportamentos adicionais, como iniciar a tarefa
+#               caso a execução anterior tenha sido perdida por indisponibilidade
+#               do host no horário programado
+#
+# A tarefa é registrada para rodar sob a conta SYSTEM com privilégios
+# elevados, dispensando a necessidade de um usuário autenticado no momento
+# da execução, o que é essencial para rotinas de backup noturnas.
+# =============================================================================
+
+Write-Log "Configurando componentes da tarefa agendada..."
+
+$action = New-ScheduledTaskAction `
+    -Execute $PwshPath `
+    -Argument $Arguments
+
+$trigger = New-ScheduledTaskTrigger `
+    -Daily `
+    -At "02:00"
+
+$settings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit    (New-TimeSpan -Hours 2) `
+    -StartWhenAvailable    `
+    -RunOnlyIfNetworkAvailable:$false `
+    -MultipleInstances     IgnoreNew
+
+Write-Log "Registrando a tarefa '$TaskName' no Agendador de Tarefas..."
+
+try {
+    Register-ScheduledTask `
+        -TaskName  $TaskName `
+        -Action    $action `
+        -Trigger   $trigger `
+        -Settings  $settings `
+        -RunLevel  Highest `
+        -User      "SYSTEM" `
+        -Force `
+        -ErrorAction Stop | Out-Null
+
+    Write-Log "Tarefa '$TaskName' registrada com sucesso."
+}
+catch {
+    Write-Log "Falha ao registrar a tarefa: $($_.Exception.Message)"
+    exit 1
+}
+
+# =============================================================================
+# BLOCO 4 — CONFIRMAÇÃO E REGISTRO EM LOG
+#
+# Após o registro, o script consulta a tarefa criada para confirmar que
+# ela está visível no Agendador de Tarefas e exibe um resumo das
+# configurações aplicadas, facilitando a auditoria e a documentação.
+# =============================================================================
+
+$tarefaCriada = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+
+if ($tarefaCriada) {
+    Write-Log "------------------------------------------------------------"
+    Write-Log "Tarefa confirmada no Agendador de Tarefas."
+    Write-Log "Nome    : $($tarefaCriada.TaskName)"
+    Write-Log "Estado  : $($tarefaCriada.State)"
+    Write-Log "Horário : diariamente às 02:00"
+    Write-Log "Log     : $LogFile"
+    Write-Log "------------------------------------------------------------"
+}
+else {
+    Write-Log "Aviso: tarefa não encontrada após o registro. Verifique manualmente no Agendador de Tarefas."
+}
