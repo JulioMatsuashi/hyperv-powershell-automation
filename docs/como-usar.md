@@ -63,8 +63,8 @@ atendidos no ambiente host.
    Exemplo criando os diretórios no disco `D:`:
 
    ```powershell
-   New-Item -ItemType Directory -Force -Path "D:\HyperV\VMs"     | Out-Null
-   New-Item -ItemType Directory -Force -Path "D:\HyperV\Backups" | Out-Null
+   New-Item -ItemType Directory -Force -Path "C:\HyperV\VMs"     | Out-Null
+   New-Item -ItemType Directory -Force -Path "C:\HyperV\Backups" | Out-Null
    New-Item -ItemType Directory -Force -Path "C:\HyperV\Logs"    | Out-Null
    ```
 
@@ -91,7 +91,7 @@ conexão ao switch e vinculação da mídia de instalação.
 |------------------|-------------|-----------------|----------------------------------------|
 | `-VMName`        | Sim         | —               | Nome da máquina virtual                |
 | `-ISOPath`       | Sim         | —               | Caminho completo do arquivo ISO        |
-| `-VMPath`        | Não         | `D:\HyperV\VMs` | Diretório base das VMs                 |
+| `-VMPath`        | Não         | `C:\HyperV\VMs` | Diretório base das VMs                 |
 | `-MemoryGB`      | Não         | `2`             | RAM em gigabytes                       |
 | `-ProcessorCount`| Não         | `2`             | Quantidade de processadores virtuais   |
 
@@ -100,8 +100,8 @@ conexão ao switch e vinculação da mídia de instalação.
 ```powershell
 .\scripts\provisionamento\Create-VM.ps1 `
     -VMName          "ServidorTeste01" `
-    -ISOPath         "D:\ISOs\WindowsServer2022.iso" `
-    -VMPath          "D:\HyperV\VMs" `
+    -ISOPath         "C:\ISOs\WindowsServer2022.iso" `
+    -VMPath          "C:\HyperV\VMs" `
     -MemoryGB        4 `
     -ProcessorCount  4
 ```
@@ -112,7 +112,7 @@ Adapte `-VMPath` e `-ISOPath` para o disco correto do seu ambiente
 Após a execução:
 
 - A VM aparecerá listada no Hyper-V Manager.
-- O disco VHDX estará em `D:\HyperV\VMs\ServidorTeste01\ServidorTeste01.vhdx`.
+- O disco VHDX estará em `C:\HyperV\VMs\ServidorTeste01\ServidorTeste01.vhdx`.
 - O log da operação estará em `C:\HyperV\Logs\CreateVM_<data_hora>.log`.
 - A instalação do sistema operacional pode ser acompanhada pelo Hyper-V
   Manager usando a opção de conexão à VM (VMConnect).
@@ -132,14 +132,14 @@ desligada de forma controlada antes da exportação e religada ao término.
 | Parâmetro     | Obrigatório | Padrão              | Descrição                        |
 |---------------|-------------|---------------------|----------------------------------|
 | `-VMName`     | Sim         | —                   | Nome da VM a ser exportada       |
-| `-BackupRoot` | Não         | `D:\HyperV\Backups` | Diretório raiz dos backups       |
+| `-BackupRoot` | Não         | `C:\HyperV\Backups` | Diretório raiz dos backups       |
 
 ### Exemplo de execução
 
 ```powershell
 .\scripts\backup\Backup-VM.ps1 `
     -VMName     "ServidorTeste01" `
-    -BackupRoot "D:\HyperV\Backups"
+    -BackupRoot "C:\HyperV\Backups"
 ```
 
 Adapte `-BackupRoot` para o disco utilizado no seu ambiente.
@@ -149,7 +149,7 @@ Após a execução:
 - Os arquivos exportados estarão em:
 
   ```text
-  D:\HyperV\Backups\ServidorTeste01_YYYYMMDD_HHmm\
+  C:\HyperV\Backups\ServidorTeste01_YYYYMMDD_HHmm\
   ```
 
 - O log da operação estará em:
@@ -248,7 +248,7 @@ via MSI.
 |----------------|-------------|---------------------------------------------------------------|----------------------------------------|
 | `-VMName`      | Sim         | —                                                             | Nome da VM cujo backup será agendado   |
 | `-ScriptPath`  | Não         | `C:\hyperv-powershell-automation\scripts\backup\Backup-VM.ps1`| Caminho do script de backup            |
-| `-BackupRoot`  | Não         | `D:\HyperV\Backups`                                           | Diretório raiz dos backups             |
+| `-BackupRoot`  | Não         | `C:\HyperV\Backups`                                           | Diretório raiz dos backups             |
 | `-TaskName`    | Não         | `Backup-VM-<VMName>`                                          | Nome da tarefa no Agendador            |
 
 #### Exemplo de execução
@@ -257,7 +257,7 @@ via MSI.
 .\utility\Register-BackupTask.ps1 `
     -VMName     "ServidorTeste01" `
     -ScriptPath "C:\hyperv-powershell-automation\scripts\backup\Backup-VM.ps1" `
-    -BackupRoot "D:\HyperV\Backups"
+    -BackupRoot "C:\HyperV\Backups"
 ```
 
 Adapte `-ScriptPath` para o caminho real do repositório no seu ambiente
