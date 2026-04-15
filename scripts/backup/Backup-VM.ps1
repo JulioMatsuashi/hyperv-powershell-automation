@@ -34,7 +34,7 @@
     Executa o backup com o diretório padrão C:\HyperV\Backups.
 
 .EXAMPLE
-    .\Backup-VM.ps1 -VMName "ServidorTeste01" -BackupRoot "D:\Backups"
+    .\Backup-VM.ps1 -VMName "ServidorTeste01" -BackupRoot "C:\Backups"
 
     Executa o backup armazenando os arquivos no disco D:.
 
