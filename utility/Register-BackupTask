@@ -28,7 +28,7 @@
 
 .PARAMETER BackupRoot
     Diretório raiz de destino dos backups, repassado ao Backup-VM.ps1.
-    Padrão: D:\HyperV\Backups
+    Padrão: C:\HyperV\Backups
 
 .PARAMETER TaskName
     Nome da tarefa criada no Agendador de Tarefas.
@@ -38,10 +38,10 @@
     .\Register-BackupTask.ps1 -VMName "ServidorTeste01"
 
     Registra a tarefa com os valores padrão: script em C:\HyperV\Scripts,
-    backup em D:\HyperV\Backups, execução diária às 02:00.
+    backup em C:\HyperV\Backups, execução diária às 02:00.
 
 .EXAMPLE
-    .\Register-BackupTask.ps1 -VMName "ServidorWeb01" -ScriptPath "D:\Scripts\Backup-VM.ps1" -BackupRoot "E:\Backups"
+    .\Register-BackupTask.ps1 -VMName "ServidorWeb01" -ScriptPath "C:\Scripts\Backup-VM.ps1" -BackupRoot "E:\Backups"
 
     Registra a tarefa apontando para caminhos personalizados.
 
@@ -61,7 +61,7 @@ param (
     [string]$VMName,
 
     [string]$ScriptPath = "C:\HyperV\Scripts\Backup-VM.ps1",
-    [string]$BackupRoot = "D:\HyperV\Backups",
+    [string]$BackupRoot = "C:\HyperV\Backups",
     [string]$TaskName   = "Backup-VM-$VMName"
 )
 
