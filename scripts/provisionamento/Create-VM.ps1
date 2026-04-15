@@ -33,15 +33,19 @@
     Quantidade de memória RAM, em gigabytes, alocada para a VM.
     Padrão: 2 GB
 
+.PARAMETER ProcessorCount
+    Quantidade de processadores virtuais alocados para a VM.
+    Padrão: 2
+
 .EXAMPLE
     .\Create-VM.ps1 -VMName "ServidorTeste01" -ISOPath "C:\ISOs\WS2022.iso"
 
-    Cria a VM com os valores padrão: 2 GB de RAM, disco de 60 GB, 1 processador virtual.
+    Cria a VM com os valores padrão: 2 GB de RAM, disco de 60 GB, 2 processadores virtuais.
 
 .EXAMPLE
-    .\Create-VM.ps1 -VMName "ServidorWeb01" -ISOPath "C:\ISOs\WS2022.iso" -MemoryGB 4 -VMPath "D:\VMs"
+    .\Create-VM.ps1 -VMName "ServidorWeb01" -ISOPath "C:\ISOs\WS2022.iso" -MemoryGB 4 -VMPath "C:\VMs" -ProcessorCount 4
 
-    Cria a VM com 4 GB de RAM no diretório D:\VMs.
+    Cria a VM com 4 GB de RAM e 4 processadores virtuais no diretório C:\VMs.
 
 .NOTES
     Requisitos de ambiente:
@@ -58,8 +62,9 @@
 param (
     [string]$VMName,
     [string]$ISOPath,
-    [string]$VMPath   = "C:\HyperV\VMs",
-    [int]   $MemoryGB = 2
+    [string]$VMPath         = "C:\HyperV\VMs",
+    [int]   $MemoryGB       = 2,
+    [int]   $ProcessorCount = 2
 )
 
 # =============================================================================
@@ -74,7 +79,6 @@ $Date    = Get-Date -Format "dd-MM-yyyy_HH-mm"
 $LogDir  = "C:\HyperV\Logs"
 $LogFile = "$LogDir\CreateVM_$Date.log"
 
-# Garante que o diretório de logs existe antes de tentar gravar nele
 if (-not (Test-Path $LogDir)) {
     New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 }
@@ -95,7 +99,7 @@ function Write-Log {
 }
 
 Write-Log "Iniciando criação da máquina virtual: $VMName"
-Write-Log "Parâmetros recebidos — Memória: $($MemoryGB)GB | Diretório base: $VMPath | ISO: $ISOPath"
+Write-Log "Parâmetros recebidos — Memória: $($MemoryGB)GB | Processadores: $ProcessorCount | Diretório base: $VMPath | ISO: $ISOPath"
 
 # =============================================================================
 # BLOCO 2 — PREPARAÇÃO DE DIRETÓRIOS E DISCO VIRTUAL
@@ -133,9 +137,10 @@ catch {
 # Em VMs de Geração 2, a unidade de DVD não existe por padrão e precisa ser
 # adicionada explicitamente antes de definir o caminho da imagem ISO.
 #
-# A memória é configurada como estática, sem balanceamento dinâmico, o que
-# garante comportamento previsível e facilita a comparação de desempenho
-# entre execuções distintas durante os testes.
+# A memória é configurada como estática e os processadores virtuais são
+# definidos conforme o parâmetro recebido, sem balanceamento dinâmico,
+# o que garante comportamento previsível e facilita a comparação de
+# desempenho entre execuções distintas durante os testes.
 # =============================================================================
 
 Write-Log "Criando a máquina virtual '$VMName' no Hyper-V (Geração 2)..."
@@ -154,6 +159,29 @@ catch {
     exit 1
 }
 
+# Configura a quantidade de processadores virtuais imediatamente após a criação
+# da VM, antes de qualquer outro recurso, garantindo que o Hyper-V registre
+# o valor corretamente enquanto a VM ainda não possui outros dispositivos associados
+try {
+    Set-VMProcessor -VMName $VMName -Count $ProcessorCount -ErrorAction Stop
+
+    $vCPUAplicado = (Get-VMProcessor -VMName $VMName).Count
+    if ($vCPUAplicado -eq $ProcessorCount) {
+        Write-Log "Processadores virtuais configurados: $vCPUAplicado vCPU(s) — verificado com sucesso."
+    }
+    else {
+        Write-Log "Aviso: o valor solicitado era $ProcessorCount vCPU(s), mas o Hyper-V aplicou $vCPUAplicado. Verifique os limites do host."
+    }
+}
+catch {
+    Write-Log "Falha ao configurar processadores virtuais: $($_.Exception.Message)"
+    exit 1
+}
+
+# Configura memória como estática
+Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $false -StartupBytes ($MemoryGB * 1GB)
+Write-Log "Memória configurada: $($MemoryGB) GB (estática)."
+
 # Associa o disco virtual VHDX à VM recém-criada
 Write-Log "Associando disco virtual à VM..."
 try {
@@ -164,10 +192,6 @@ catch {
     Write-Log "Falha ao associar o disco virtual: $($_.Exception.Message)"
     exit 1
 }
-
-# Configura memória como estática
-Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $false -StartupBytes ($MemoryGB * 1GB)
-Write-Log "Memória configurada: $($MemoryGB) GB (estática)."
 
 # Adiciona a unidade de DVD e vincula a ISO de instalação
 Write-Log "Configurando mídia de instalação (ISO)..."
@@ -191,9 +215,10 @@ catch {
 # BLOCO 4 — INICIALIZAÇÃO DA MÁQUINA E REGISTRO EM LOG
 #
 # Com todos os recursos configurados, a VM é iniciada. A partir deste ponto,
-# o Hyper-V realizará o boot pelo DVD e exibirá a tela de instalação do
-# sistema operacional. O administrador pode acompanhar o processo pelo
-# Hyper-V Manager utilizando a opção de conexão à VM (VMConnect).
+# o administrador pode acompanhar o processo pelo Hyper-V Manager utilizando
+# a opção de conexão à VM (VMConnect). Caso o boot não ocorra pela mídia de
+# instalação automaticamente, executar o script Set-VMBootOrder.ps1
+# disponível no repositório como etapa complementar de configuração.
 # =============================================================================
 
 Write-Log "Iniciando a máquina virtual '$VMName'..."
